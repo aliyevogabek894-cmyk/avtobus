@@ -110,7 +110,7 @@ class PgConnectionWrapper:
 def get_db():
     if DATABASE_URL and ("postgres" in DATABASE_URL):
         try:
-            url = DATABASE_URL.strip().strip("'").strip('"')
+            url = re.sub(r'[\r\n\t]+', '', DATABASE_URL).strip().strip("'").strip('"')
             if url.startswith("postgres://"):
                 url = "postgresql://" + url[len("postgres://"):]
             conn = psycopg.connect(url, row_factory=pg_row_factory, connect_timeout=10)

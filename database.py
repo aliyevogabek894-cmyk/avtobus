@@ -108,20 +108,26 @@ class PgConnectionWrapper:
         self.close()
 
 def get_db():
-    if USE_POSTGRES:
-        conn = psycopg.connect(DATABASE_URL, row_factory=pg_row_factory)
-        conn.autocommit = False
-        return PgConnectionWrapper(conn)
-    else:
-        conn = sqlite3.connect(DATABASE_PATH, timeout=30.0, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON;")
-        conn.execute("PRAGMA journal_mode = WAL;")
-        conn.execute("PRAGMA synchronous = NORMAL;")
-        conn.execute("PRAGMA busy_timeout = 15000;")
-        conn.execute("PRAGMA cache_size = -64000;")
-        conn.execute("PRAGMA temp_store = MEMORY;")
-        return conn
+    if DATABASE_URL and ("postgres" in DATABASE_URL):
+        try:
+            url = DATABASE_URL.strip().strip("'").strip('"')
+            if url.startswith("postgres://"):
+                url = "postgresql://" + url[len("postgres://"):]
+            conn = psycopg.connect(url, row_factory=pg_row_factory, connect_timeout=10)
+            conn.autocommit = False
+            return PgConnectionWrapper(conn)
+        except Exception as e:
+            print(f"[DATABASE WARNING] PostgreSQL ulanishda xatolik: {e}. SQLite rejimiga o'tildi.")
+
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30.0, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA busy_timeout = 15000;")
+    conn.execute("PRAGMA cache_size = -64000;")
+    conn.execute("PRAGMA temp_store = MEMORY;")
+    return conn
 
 @contextmanager
 def get_db_cursor():
@@ -137,8 +143,11 @@ def get_db_cursor():
         conn.close()
 
 def init_db():
-    with get_db_cursor() as cur:
-        if USE_POSTGRES:
+    conn = get_db()
+    is_pg = isinstance(conn, PgConnectionWrapper)
+    cur = conn.cursor()
+    try:
+        if is_pg:
             # 1. users
             cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -462,6 +471,12 @@ def init_db():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_stop_arrivals_trip ON stop_arrivals(trip_id);")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_buses_active ON buses(is_active, is_deleted);")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_routes_active ON routes(is_active, is_deleted);")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 def log_audit(user_id: int | None, username: str | None, action: str, entity_type: str, entity_id: str | None, details: str, ip_address: str = ""):
     with get_db_cursor() as cur:

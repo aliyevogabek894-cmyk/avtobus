@@ -4,10 +4,14 @@ from datetime import datetime
 from config import DATABASE_PATH
 
 def get_db():
-    conn = sqlite3.connect(DATABASE_PATH, timeout=20.0, check_same_thread=False)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA busy_timeout = 15000;")
+    conn.execute("PRAGMA cache_size = -64000;")
+    conn.execute("PRAGMA temp_store = MEMORY;")
     return conn
 
 @contextmanager
@@ -187,11 +191,15 @@ def init_db():
         );
         """)
 
-        # Indexes for fast querying
+        # Indexes for fast querying under high concurrency (100+ users)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_trips_status ON trips(status);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_trips_route_status ON trips(route_id, status);")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_gps_positions_trip ON gps_positions(trip_id, timestamp);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_gps_positions_trip_id_desc ON gps_positions(trip_id, id DESC);")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_route_stops_route ON route_stops(route_id, stop_order);")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_stop_arrivals_trip ON stop_arrivals(trip_id);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_buses_active ON buses(is_active, is_deleted);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_routes_active ON routes(is_active, is_deleted);")
 
 def log_audit(user_id: int | None, username: str | None, action: str, entity_type: str, entity_id: str | None, details: str, ip_address: str = ""):
     with get_db_cursor() as cur:

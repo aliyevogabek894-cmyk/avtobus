@@ -37,6 +37,9 @@ app = FastAPI(
     version="2.0.0"
 )
 
+from fastapi.middleware.gzip import GZipMiddleware
+import time
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,6 +47,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.middleware("http")
 async def handle_head_requests(request: Request, call_next):
@@ -52,6 +56,33 @@ async def handle_head_requests(request: Request, call_next):
         response = await call_next(request)
         return Response(status_code=response.status_code, headers=dict(response.headers))
     return await call_next(request)
+
+# High-concurrency Micro-Cache (prevents DB lock and latency under 100+ simultaneous users)
+class SimpleTTLCache:
+    def __init__(self, ttl_seconds: float = 1.5):
+        self.ttl = ttl_seconds
+        self._cache = {}
+
+    def get(self, key):
+        entry = self._cache.get(key)
+        if entry:
+            val, expiry = entry
+            if time.time() < expiry:
+                return val
+            del self._cache[key]
+        return None
+
+    def set(self, key, value):
+        self._cache[key] = (value, time.time() + self.ttl)
+
+    def invalidate(self, key=None):
+        if key is None:
+            self._cache.clear()
+        elif key in self._cache:
+            del self._cache[key]
+
+public_routes_cache = SimpleTTLCache(ttl_seconds=2.0)
+public_route_detail_cache = SimpleTTLCache(ttl_seconds=1.5)
 
 # ----------------- PYDANTIC SCHEMAS -----------------
 
@@ -157,6 +188,10 @@ def get_public_routes():
     Returns list of all active routes for parents with live bus tracking status.
     Notice: Driver private personal data is excluded for privacy.
     """
+    cached = public_routes_cache.get("all")
+    if cached is not None:
+        return cached
+
     conn = get_db()
     try:
         routes = conn.execute("""
@@ -228,7 +263,9 @@ def get_public_routes():
 
             result.append(route_dict)
 
-        return {"routes": result}
+        resp = {"routes": result}
+        public_routes_cache.set("all", resp)
+        return resp
     finally:
         conn.close()
 
@@ -237,6 +274,10 @@ def get_public_route_detail(route_id: int):
     """
     Detailed route view for parents: route stops, live bus GPS, completed stops, next stop.
     """
+    cached = public_route_detail_cache.get(route_id)
+    if cached is not None:
+        return cached
+
     conn = get_db()
     try:
         route = conn.execute("""
@@ -313,7 +354,7 @@ def get_public_route_detail(route_id: int):
                     next_target_stop = s
                     break
 
-        return {
+        resp = {
             "route": route_data,
             "stops": stops_list,
             "trip": dict(trip) if trip else None,
@@ -323,6 +364,8 @@ def get_public_route_detail(route_id: int):
             "is_gps_stale": is_gps_stale,
             "next_stop": next_target_stop
         }
+        public_route_detail_cache.set(route_id, resp)
+        return resp
     finally:
         conn.close()
 
@@ -588,6 +631,8 @@ async def driver_send_gps(payload: GPSPayload, user: dict = Depends(require_driv
     )
     if "error" in res:
         raise HTTPException(status_code=400, detail=res["error"])
+    public_route_detail_cache.invalidate()
+    public_routes_cache.invalidate()
     return res
 
 @app.post("/api/driver/trip/end")

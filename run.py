@@ -24,4 +24,12 @@ if __name__ == "__main__":
     print("To'xtatish uchun: Ctrl + C bosing.")
     print("=" * 60)
 
-    uvicorn.run("main:app", host=host, port=port, reload=False)
+    uvicorn.run(
+        "main:app",
+        host=host,
+        port=port,
+        reload=False,
+        access_log=False,
+        timeout_keep_alive=65,
+        limit_concurrency=1000
+    )

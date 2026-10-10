@@ -29,8 +29,8 @@ def seed_database():
         # 1. Admin user
         admin_pass = hash_password("Admin2026!")
         cur.execute("""
-            INSERT INTO users (id, username, password_hash, role, full_name, phone, is_active)
-            VALUES (1, 'admin', ?, 'admin', 'Bosh Administrator', '+998901234567', 1)
+            INSERT INTO users (username, password_hash, role, full_name, phone, is_active)
+            VALUES ('admin', ?, 'admin', 'Bosh Administrator', '+998901234567', 1)
         """, (admin_pass,))
 
         # 2. Driver accounts (11 drivers)
@@ -271,8 +271,9 @@ def seed_database():
             ("gps_update_interval", "4", "Haydovchi GPS yangilanish intervali (soniyada)")
         ]
         for k, v, d in settings_defaults:
+            cur.execute("DELETE FROM system_settings WHERE key = ?", (k,))
             cur.execute("""
-                INSERT OR REPLACE INTO system_settings (key, value, description)
+                INSERT INTO system_settings (key, value, description)
                 VALUES (?, ?, ?)
             """, (k, v, d))
 

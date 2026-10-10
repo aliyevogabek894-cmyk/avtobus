@@ -1189,8 +1189,10 @@ def admin_get_telegram_settings(admin: dict = Depends(require_admin)):
 @app.post("/api/admin/telegram/settings")
 def admin_save_telegram_settings(payload: TelegramSettingsRequest, admin: dict = Depends(require_admin)):
     with get_db_cursor() as cur:
-        cur.execute("INSERT OR REPLACE INTO system_settings (key, value, description) VALUES ('telegram_bot_token', ?, 'Telegram Bot Token')", (payload.bot_token.strip(),))
-        cur.execute("INSERT OR REPLACE INTO system_settings (key, value, description) VALUES ('telegram_default_chat_id', ?, 'Telegram Default Chat ID')", (payload.default_chat_id.strip(),))
+        cur.execute("DELETE FROM system_settings WHERE key = 'telegram_bot_token'")
+        cur.execute("INSERT INTO system_settings (key, value, description) VALUES ('telegram_bot_token', ?, 'Telegram Bot Token')", (payload.bot_token.strip(),))
+        cur.execute("DELETE FROM system_settings WHERE key = 'telegram_default_chat_id'")
+        cur.execute("INSERT INTO system_settings (key, value, description) VALUES ('telegram_default_chat_id', ?, 'Telegram Default Chat ID')", (payload.default_chat_id.strip(),))
 
     log_audit(admin["id"], admin["username"], "update_telegram", "system", "telegram", "Telegram bot sozlamalari yangilandi")
     return {"success": True, "message": "Telegram sozlamalari saqlandi"}

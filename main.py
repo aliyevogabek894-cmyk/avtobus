@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, date
 from typing import Optional, List
-from fastapi import FastAPI, Depends, HTTPException, Query, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, status, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +44,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def handle_head_requests(request: Request, call_next):
+    if request.method == "HEAD":
+        request.scope["method"] = "GET"
+        response = await call_next(request)
+        return Response(status_code=response.status_code, headers=dict(response.headers))
+    return await call_next(request)
 
 # ----------------- PYDANTIC SCHEMAS -----------------
 

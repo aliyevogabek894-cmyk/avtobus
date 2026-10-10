@@ -138,6 +138,11 @@ class TelegramTestRequest(BaseModel):
 
 # ----------------- PUBLIC / PARENTS ENDPOINTS -----------------
 
+@app.get("/health")
+@app.get("/ping")
+def health_check():
+    return {"status": "ok", "message": "Service is healthy and active"}
+
 @app.get("/api/public/routes")
 def get_public_routes():
     """

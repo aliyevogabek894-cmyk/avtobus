@@ -28,6 +28,8 @@ from telegram_service import send_telegram_message
 
 # Initialize App and DB
 init_db()
+from seed_data import seed_database
+seed_database()
 
 app = FastAPI(
     title="Smart School Bus Management & GPS Tracking API",

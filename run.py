@@ -1,3 +1,4 @@
+import os
 import uvicorn
 from database import init_db
 from seed_data import seed_database
@@ -11,13 +12,16 @@ if __name__ == "__main__":
     init_db()
     seed_database()
 
+    port = int(os.environ.get("PORT", 8000))
+    host = "0.0.0.0"
+
     print("\nServer ishga tushmoqda:")
-    print(" -> Asosiy Hub:        http://127.0.0.1:8000")
-    print(" -> Ota-onalar Sayti:  http://127.0.0.1:8000/parent")
-    print(" -> Haydovchi Paneli:  http://127.0.0.1:8000/driver")
-    print(" -> Admin Paneli:      http://127.0.0.1:8000/admin")
-    print(" -> API Hujjatlari:    http://127.0.0.1:8000/docs\n")
+    print(f" -> Asosiy Hub:        http://{host}:{port}")
+    print(f" -> Ota-onalar Sayti:  http://{host}:{port}/parent")
+    print(f" -> Haydovchi Paneli:  http://{host}:{port}/driver")
+    print(f" -> Admin Paneli:      http://{host}:{port}/admin")
+    print(f" -> API Hujjatlari:    http://{host}:{port}/docs\n")
     print("To'xtatish uchun: Ctrl + C bosing.")
     print("=" * 60)
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host=host, port=port, reload=False)

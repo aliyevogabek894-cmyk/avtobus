@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart School Bus — Maktab Avtobuslarini Boshqarish va GPS Kuzatuv Tizimi</title>
+  <meta name="description" content="Maktab avtobuslari uchun to'liq boshqaruv, haydovchi GPS uzatmasi va ota-onalar jonli kuzatuv platformasi">
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <style>
+    .hero-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 4rem 1.5rem 6rem;
+      text-align: center;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      padding: 0.4rem 1rem;
+      border-radius: var(--radius-full);
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-title {
+      font-size: 3.2rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      max-width: 760px;
+      margin: 0 auto 3.5rem;
+    }
+
+    .portal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 2rem;
+      text-align: left;
+    }
+
+    .portal-card {
+      padding: 2.25rem;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: 1px solid var(--border-color);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .portal-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.5), 0 0 20px rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .portal-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .icon-parent {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.4) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .icon-driver {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.4) 100%);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .icon-admin {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(124, 58, 237, 0.4) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+
+    .portal-card h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: #fff;
+    }
+
+    .portal-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.75rem;
+      line-height: 1.6;
+    }
+
+    .portal-features {
+      list-style: none;
+      margin-bottom: 2rem;
+    }
+
+    .portal-features li {
+      font-size: 0.88rem;
+      color: #cbd5e1;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .portal-features li::before {
+      content: '✓';
+      color: var(--success);
+      font-weight: bold;
+    }
+
+    .stats-ticker {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      margin-top: 4rem;
+      padding: 1.5rem;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+      flex-wrap: wrap;
+    }
+
+    .ticker-item {
+      text-align: center;
+    }
+
+    .ticker-val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      font-family: 'Outfit', sans-serif;
+      color: #fff;
+    }
+
+    .ticker-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="brand-badge">
+      <div class="brand-icon">🚌</div>
+      <div>
+        <span>SMART SCHOOL BUS</span>
+        <span style="display:block; font-size:0.75rem; color:var(--text-muted); font-weight:400;">GPS & Avtobuslar Markazi</span>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="/parent" class="nav-link">👨‍👩‍👧 Ota-onalar</a>
+      <a href="/driver" class="nav-link">🚌 Haydovchi</a>
+      <a href="/admin" class="nav-link">⚙️ Admin</a>
+    </nav>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="hero-container">
+    <div class="hero-badge">
+      <span class="pulse-dot"></span>
+      Farg‘ona Shahri • 11 Ta Yo‘nalish • Jonli GPS Tizimi
+    </div>
+
+    <h1 class="hero-title">Maktab Avtobuslarini Boshqarish Va Jonli GPS Kuzatuvi</h1>
+    <p class="hero-desc">
+      Maktabimizning barcha yo‘nalishlari, bekatlari va avtobuslarini yagona platforma orqali boshqaring. 
+      Ota-onalar farzandlari avtobusini real vaqtda xaritada kuzatishadi, Telegram orqali bekatga yetib kelish bildirishnomalarini olishadi.
+    </p>
+
+    <!-- Portal Cards -->
+    <div class="portal-grid">
+      
+      <!-- Parent Portal Card -->
+      <div class="portal-card glass-panel">
+        <div>
+          <div class="portal-icon icon-parent">👨‍👩‍👧</div>
+          <h3>Ota-onalar Portali</h3>
+          <p>Login talab qilinmaydi. Farzandingiz yo‘nalishini tanlang va avtobusning xaritadagi jonli joylashuvini real vaqtda kuzating.</p>
+          <ul class="portal-features">
+            <li>OpenStreetMap interaktiv xaritasi</li>
+            <li>Avtobusning haqiqiy GPS harakati</li>
+            <li>Yetib o‘tilgan va kutilayotgan bekatlar</li>
+            <li>Mobil telefonlarga to‘liq moslashgan</li>
+          </ul>
+        </div>
+        <a href="/parent" class="btn btn-success btn-lg" style="width: 100%;">
+          Kuzatuvni Boshlash →
+        </a>
+      </div>
+
+      <!-- Driver Portal Card -->
+      <div class="portal-card glass-panel">
+        <div>
+          <div class="portal-icon icon-driver">🚍</div>
+          <h3>Haydovchi Paneli</h3>
+          <p>Haydovchi shaxsiy hisobiga kiradi, o‘ziga biriktirilgan yo‘nalishni ko‘radi va bir tugma bilan GPS safarini boshlaydi.</p>
+          <ul class="portal-features">
+            <li>Katta "YO‘LNI BOSHLASH" tugmasi</li>
+            <li>Avtomatik geofence bekat aniqlash</li>
+            <li>Telegram guruhga avtomatik xabar</li>
+            <li>GPS simulyatori (Demo sinov rejimi)</li>
+          </ul>
+        </div>
+        <a href="/driver" class="btn btn-primary btn-lg" style="width: 100%; background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);">
+          Haydovchi Kirishi →
+        </a>
+      </div>
+
+      <!-- Admin Portal Card -->
+      <div class="portal-card glass-panel">
+        <div>
+          <div class="portal-icon icon-admin">⚙️</div>
+          <h3>Admin Boshqaruv Markazi</h3>
+          <p>Maktab ma’muriyati uchun to‘liq himoyalangan boshqaruv paneli. Avtobuslar, yo‘nalishlar, bekatlar va xavfsizlik.</p>
+          <ul class="portal-features">
+            <li>Statistika kartalari va jonli monitoring</li>
+            <li>Xarita orqali bekatlarni belgilash</li>
+            <li>Yo‘nalish parollarini xavfsiz boshqarish (bcrypt)</li>
+            <li>Telegram sozlamalari va audit jurnali</li>
+          </ul>
+        </div>
+        <a href="/admin" class="btn btn-primary btn-lg" style="width: 100%;">
+          Boshqaruv Paneliga Kirish →
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Quick Stats Ticker -->
+    <div class="stats-ticker glass-panel" id="statsTicker">
+      <div class="ticker-item">
+        <div class="ticker-val" id="tBuses">11</div>
+        <div class="ticker-label">Jami Avtobuslar</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-val" id="tRoutes">11</div>
+        <div class="ticker-label">Maktab Yo‘nalishlari</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-val" id="tStops">55</div>
+        <div class="ticker-label">Tasdiqlangan Bekatlar</div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-val" id="tActive" style="color: #34d399;">Jonli</div>
+        <div class="ticker-label">GPS Geofencing Tizimi</div>
+      </div>
+    </div>
+  </main>
+
+  <footer style="text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.85rem; border-top: 1px solid var(--border-color);">
+    © 2026 SMART SCHOOL BUS TIZIMI • Barcha huquqlar himoyalangan.
+  </footer>
+
+</body>
+</html>

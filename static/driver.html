@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Haydovchi Paneli — Smart School Bus</title>
+  <meta name="description" content="Haydovchi mobil GPS kuzatuv boshqaruvi va fon rejimida uzatish">
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <style>
+    body {
+      background: #090e1a;
+      user-select: none;
+    }
+
+    .driver-container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 1rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .btn-trip-action {
+      height: 76px;
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      border-radius: var(--radius-lg);
+      width: 100%;
+      text-transform: uppercase;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+    }
+
+    .bg-active-pill {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      border-radius: var(--radius-md);
+      padding: 0.6rem 0.9rem;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .stat-badge-box {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 0.85rem 1rem;
+      text-align: center;
+    }
+
+    .stat-badge-val {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .stat-badge-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 0.15rem;
+    }
+
+    #driverMap {
+      width: 100%;
+      height: 280px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      margin-top: 0.5rem;
+    }
+
+    .auth-card {
+      max-width: 440px;
+      margin: 4rem auto;
+      padding: 2.25rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Driver Header -->
+  <header class="navbar" style="padding: 0.75rem 1.25rem;">
+    <div class="brand-badge">
+      <div class="brand-icon" style="background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);">🚍</div>
+      <div>
+        <span style="font-size: 1.1rem;">HAYDOVCHI PANELI</span>
+        <span id="driverHeaderName" style="display:block; font-size:0.75rem; color:var(--text-muted);">Tizimga kiring</span>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.5rem;">
+      <button id="logoutBtn" class="btn btn-secondary btn-sm" style="display:none;" onclick="driverLogout()">Chiqish</button>
+      <a href="/" class="btn btn-secondary btn-sm">Bosh sahifa</a>
+    </div>
+  </header>
+
+  <!-- Login Screen -->
+  <div id="loginSection" class="auth-card glass-panel">
+    <div style="text-align:center; margin-bottom: 1.75rem;">
+      <div style="font-size: 2.8rem; margin-bottom: 0.5rem;">👨‍✈️</div>
+      <h2 style="font-size: 1.5rem; font-weight: 800;">Haydovchi Kirishi</h2>
+      <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.35rem;">
+        O‘zingizga biriktirilgan yo‘nalishga kirish uchun login va parolni kiriting.
+      </p>
+    </div>
+
+    <form id="driverLoginForm" onsubmit="handleDriverLogin(event)">
+      <div class="form-group">
+        <label class="form-label">Login (Masalan: haydovchi1)</label>
+        <input type="text" id="loginUsername" class="form-input" placeholder="Loginni kiriting" required autocomplete="username">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Parol</label>
+        <input type="password" id="loginPassword" class="form-input" placeholder="Parolni kiriting" required autocomplete="current-password">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 0.5rem;">
+        Tizimga Kirish →
+      </button>
+
+      <div style="margin-top: 1.5rem; padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-radius: var(--radius-sm); font-size: 0.8rem; color: #cbd5e1; text-align: center;">
+        💡 <b>Boshlang‘ich haydovchi:</b> login: <code style="color:#a5b4fc;">haydovchi1</code> | parol: <code style="color:#a5b4fc;">Haydovchi2026!</code>
+      </div>
+    </form>
+  </div>
+
+  <!-- Driver Active Dashboard -->
+  <main id="driverDashboard" class="driver-container" style="display: none;">
+    
+    <!-- Route & Bus Card -->
+    <div class="glass-panel" style="padding: 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span class="badge badge-info" id="driverRouteNumber">1-yo‘nalish</span>
+          <h2 style="font-size: 1.35rem; font-weight: 800; margin: 0.35rem 0;" id="driverRouteName">Yunusobod – Maktab</h2>
+          <div style="font-size: 0.85rem; color: var(--text-muted);" id="driverBusPlate">Avtobus: 01 | 701 SAA</div>
+        </div>
+        <div style="text-align: right;">
+          <div id="gpsStatusPill" class="badge badge-gray">
+            GPS Kutilmoqda
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Background Persistence Active Alert -->
+    <div id="bgKeepAliveAlert" class="bg-active-pill" style="display: none;">
+      <span class="pulse-dot"></span>
+      <span><b>Fon rejimi faol:</b> Saytdan chiqsangiz ham, siz "SAFARNI TUGATISH"ni bosmaguncha GPS uzatilib turadi.</span>
+    </div>
+
+    <!-- Big Action Button Area -->
+    <div id="actionButtonArea">
+      <button id="startTripBtn" class="btn btn-success btn-trip-action" onclick="startTrip()">
+        <span>🚀</span> YO‘LNI BOSHLASH
+      </button>
+      <button id="endTripBtn" class="btn btn-danger btn-trip-action" style="display: none;" onclick="endTrip()">
+        <span>🛑</span> SAFARNI TUGATISH
+      </button>
+    </div>
+
+    <!-- Live Navigation Card -->
+    <div class="glass-panel" style="padding: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <span style="font-size: 0.82rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">NAV BATDAGI BEKAT:</span>
+        <span class="badge badge-warning" id="nextStopDistanceBadge">— metr</span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem;">
+        <div style="font-size: 2rem;">📍</div>
+        <div>
+          <div style="font-size: 1.3rem; font-weight: 800; color: #fff;" id="nextStopName">
+            Safar boshlanmagan
+          </div>
+          <div style="font-size: 0.82rem; color: var(--text-muted);" id="nextStopSub">
+            Safar boshlanganda birinchi bekat ko‘rsatiladi
+          </div>
+        </div>
+      </div>
+
+      <!-- Live metrics -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
+        <div class="stat-badge-box">
+          <div class="stat-badge-val" id="metricSpeed">0</div>
+          <div class="stat-badge-title">Tezlik (km/s)</div>
+        </div>
+        <div class="stat-badge-box">
+          <div class="stat-badge-val" id="metricAccuracy">10m</div>
+          <div class="stat-badge-title">Aniqlik</div>
+        </div>
+        <div class="stat-badge-box">
+          <div class="stat-badge-val" id="metricVisitedCount">0/5</div>
+          <div class="stat-badge-title">Bekatlar</div>
+        </div>
+      </div>
+
+      <!-- Live Leaflet Mini Map -->
+      <div id="driverMap"></div>
+    </div>
+
+    <!-- GPS Mode / Simulator Controls for Testing & Reliability -->
+    <div class="glass-panel" style="padding: 1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight: 700; font-size: 0.95rem;">GPS Manbasi</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);" id="gpsModeLabel">Haqiqiy qurilma GPS datchigi</div>
+        </div>
+        <button id="toggleSimBtn" class="btn btn-secondary btn-sm" onclick="toggleGpsMode()">
+          🎮 Sinov Simulyatoriga o'tish
+        </button>
+      </div>
+
+      <div id="simControls" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+        <div style="font-size: 0.8rem; color: #cbd5e1; margin-bottom: 0.5rem;">
+          Avtomatik simulyatsiya avtobusni bekatlar bo‘ylab harakatlantiradi va bekatga yetganda xabar jo‘natadi:
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <button class="btn btn-primary btn-sm" style="flex:1;" onclick="simNextStep()">
+            ➡️ Keyingi Bekatga Yurish
+          </button>
+          <button id="simAutoPlayBtn" class="btn btn-secondary btn-sm" onclick="toggleSimAutoPlay()">
+            ▶️ Avtomatik Harakat
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Audio ding element for stop arrival notification -->
+  <audio id="arrivalAudio" preload="auto">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+  </audio>
+
+  <!-- Silent Audio Loop to keep mobile browser geolocation alive in background! -->
+  <audio id="silentAudioLoop" loop preload="auto" src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAP8A"></audio>
+
+  <!-- Toast notification container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/js/driver.js"></script>
+</body>
+</html>

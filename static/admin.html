@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Boshqaruv Markazi — Smart School Bus</title>
+  <meta name="description" content="Maktab avtobuslari boshqaruv paneli, xaritalar, yo'nalishlar, parollar va xavfsizlik monitoringi">
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <style>
+    .admin-app-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+    }
+
+    @media (max-width: 1024px) {
+      .admin-app-layout {
+        grid-template-columns: 1fr;
+      }
+      .admin-sidebar {
+        display: none;
+      }
+    }
+
+    /* Sidebar */
+    .admin-sidebar {
+      background: #090e1b;
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .sidebar-brand {
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .sidebar-menu {
+      padding: 1rem 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      flex: 1;
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-md);
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.92rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .menu-item:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .menu-item.active {
+      color: #fff;
+      background: var(--primary-gradient);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+      font-weight: 600;
+    }
+
+    .admin-main-content {
+      padding: 2rem;
+      max-width: 1500px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Top stats grid */
+    .stats-card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card-val {
+      font-size: 2.1rem;
+      font-weight: 800;
+      font-family: 'Outfit', sans-serif;
+      margin-top: 0.25rem;
+    }
+
+    .stat-card-title {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .stat-card-icon {
+      position: absolute;
+      top: 1rem;
+      right: 1.25rem;
+      font-size: 1.8rem;
+      opacity: 0.25;
+    }
+
+    /* View containers */
+    .admin-view-panel {
+      display: none;
+    }
+    .admin-view-panel.active {
+      display: block;
+      animation: fadeIn 0.25s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #adminOverviewMap, #stopPickerMap {
+      width: 100%;
+      height: 480px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+    }
+
+    #stopPickerMap {
+      height: 320px;
+    }
+
+    .auth-login-box {
+      max-width: 420px;
+      margin: 6rem auto;
+      padding: 2.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ADMIN LOGIN OVERLAY (Shows if not logged in) -->
+  <div id="adminLoginSection" class="auth-login-box glass-panel">
+    <div style="text-align: center; margin-bottom: 2rem;">
+      <div style="width:56px; height:56px; background:var(--primary-gradient); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; font-size:1.8rem; margin:0 auto 1rem;">🛡️</div>
+      <h2 style="font-size: 1.6rem; font-weight: 800;">Administrator Kirishi</h2>
+      <p style="color: var(--text-muted); font-size: 0.88rem; margin-top: 0.35rem;">
+        Smart School Bus tizimini boshqarish uchun admin hisobingizga kiring.
+      </p>
+    </div>
+
+    <form onsubmit="handleAdminLogin(event)">
+      <div class="form-group">
+        <label class="form-label">Administrator Logini</label>
+        <input type="text" id="adminLoginUsername" class="form-input" placeholder="admin" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Parol</label>
+        <input type="password" id="adminLoginPassword" class="form-input" placeholder="Parol" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 0.5rem;">
+        Boshqaruv Paneliga Kirish →
+      </button>
+
+      <div style="margin-top: 1.5rem; padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border-radius: var(--radius-sm); font-size: 0.8rem; color: #cbd5e1; text-align: center;">
+        💡 <b>Boshlang‘ich admin:</b> login: <code style="color:#a5b4fc;">admin</code> | parol: <code style="color:#a5b4fc;">Admin2026!</code>
+      </div>
+    </form>
+  </div>
+
+  <!-- ADMIN APP INTERFACE (Visible after login) -->
+  <div id="adminAppLayout" class="admin-app-layout" style="display: none;">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="admin-sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">🚌</div>
+        <div>
+          <div style="font-weight: 800; font-size: 1rem; color: #fff;">SMART SCHOOL</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">Admin Panel</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-menu">
+        <div class="menu-item active" onclick="switchTab('dashboard')">
+          <span>📊</span> Bosh Sahifa (Dashboard)
+        </div>
+        <div class="menu-item" onclick="switchTab('live-map')">
+          <span>🗺️</span> Jonli Xarita
+        </div>
+        <div class="menu-item" onclick="switchTab('buses')">
+          <span>🚌</span> Avtobuslar
+        </div>
+        <div class="menu-item" onclick="switchTab('routes')">
+          <span>🛣️</span> Yo‘nalishlar
+        </div>
+        <div class="menu-item" onclick="switchTab('stops')">
+          <span>📍</span> Bekatlar (Xarita bilan)
+        </div>
+        <div class="menu-item" onclick="switchTab('drivers')">
+          <span>👤</span> Haydovchilar & Parollar
+        </div>
+        <div class="menu-item" onclick="switchTab('telegram')">
+          <span>📱</span> Telegram Sozlamalari
+        </div>
+        <div class="menu-item" onclick="switchTab('trips')">
+          <span>⏱️</span> Safarlar Tarixi
+        </div>
+        <div class="menu-item" onclick="switchTab('audit')">
+          <span>🛡️</span> Audit Jurnali
+        </div>
+      </nav>
+
+      <div style="padding: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 0.85rem; font-weight: 700;" id="adminCurrentUserName">Administrator</div>
+          <div style="font-size: 0.75rem; color: #10b981;">● Xavfsiz sessiya</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="adminLogout()">Chiqish</button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="admin-main-content">
+      
+      <!-- Top Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+        <div>
+          <h1 style="font-size: 1.8rem; font-weight: 800;" id="pageHeading">Bosh Sahifa</h1>
+          <p style="color: var(--text-muted); font-size: 0.9rem;" id="pageSubHeading">Barcha avtobuslar va safarlarning umumiy statistikasi</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <a href="/parent" target="_blank" class="btn btn-secondary btn-sm">👨‍👩‍👧 Ota-onalar Sayti ↗</a>
+          <a href="/driver" target="_blank" class="btn btn-secondary btn-sm">🚍 Haydovchi Sayti ↗</a>
+        </div>
+      </div>
+
+      <!-- 1. DASHBOARD VIEW -->
+      <section id="view-dashboard" class="admin-view-panel active">
+        <!-- 8 Stat Cards from requirements -->
+        <div class="stats-card-grid">
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">Jami Avtobuslar</span>
+            <div class="stat-card-val" id="statBuses" style="color:#818cf8;">—</div>
+            <div class="stat-card-icon">🚌</div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">Jami Yo‘nalishlar</span>
+            <div class="stat-card-val" id="statRoutes" style="color:#38bdf8;">—</div>
+            <div class="stat-card-icon">🛣️</div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">Jami Bekatlar</span>
+            <div class="stat-card-val" id="statStops" style="color:#34d399;">—</div>
+            <div class="stat-card-icon">📍</div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">Hozir Safardagilar</span>
+            <div class="stat-card-val" id="statActiveTrips" style="color:#fbbf24;">—</div>
+            <div class="stat-card-icon">🚀</div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">GPS Faol Avtobuslar</span>
+            <div class="stat-card-val" id="statGpsActive" style="color:#10b981;">—</div>
+            <div class="stat-card-icon">📡</div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">GPS Aloqasi Uzilgan</span>
+            <div class="stat-card-val" id="statGpsStale" style="color:#f87171;">—</div>
+            <div class="stat-card-icon">⚠️</div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">Bugungi Safarlar</span>
+            <div class="stat-card-val" id="statTodayTrips" style="color:#c084fc;">—</div>
+            <div class="stat-card-icon">📅</div>
+          </div>
+          <div class="stat-card glass-panel">
+            <span class="stat-card-title">Telegram Xabarlar</span>
+            <div class="stat-card-val" id="statTelegram" style="color:#60a5fa;">—</div>
+            <div class="stat-card-icon">💬</div>
+          </div>
+        </div>
+
+        <!-- Live Fleet Table & Quick Map -->
+        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 2rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <h3 style="font-size: 1.25rem; font-weight: 700;">Haqiqiy Vaqtdagi Avtobuslar Monitoringi</h3>
+            <span class="badge badge-success"><span class="pulse-dot"></span> Jonli Yangilanmoqda</span>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Avtobus</th>
+                  <th>Davlat Raqami</th>
+                  <th>Yo‘nalish</th>
+                  <th>Haydovchi</th>
+                  <th>Safar Holati</th>
+                  <th>GPS Holati</th>
+                  <th>Oxirgi Yangilanish</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardBusesTableBody">
+                <tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-muted);">Yuklanmoqda...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. LIVE MAP VIEW -->
+      <section id="view-live-map" class="admin-view-panel">
+        <div class="glass-panel" style="padding: 1.25rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+            <div>
+              <h3 style="font-size: 1.2rem; font-weight: 700;">Barcha Avtobuslarning Yagona Jonli Xaritasi (Farg‘ona)</h3>
+              <p style="color:var(--text-muted); font-size:0.85rem;">Farg‘ona shahri bo‘ylab harakatdagi avtobuslar va bekatlar</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="loadLiveMapData()">🔄 Yangilash</button>
+          </div>
+          <div id="adminOverviewMap"></div>
+        </div>
+      </section>
+
+      <!-- 3. BUSES MANAGEMENT VIEW -->
+      <section id="view-buses" class="admin-view-panel">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Avtobuslar Ro‘yxati</h3>
+            <button class="btn btn-primary btn-sm" onclick="openBusModal()">+ Yangi Avtobus Qo‘shish</button>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Avtobus Nomi</th>
+                  <th>Davlat Raqami</th>
+                  <th>Model</th>
+                  <th>Sig‘imi</th>
+                  <th>Biriktirilgan Yo‘nalish</th>
+                  <th>Holati</th>
+                  <th>Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="busesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. ROUTES MANAGEMENT VIEW -->
+      <section id="view-routes" class="admin-view-panel">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Maktab Yo‘nalishlari (10–11 ta)</h3>
+            <button class="btn btn-primary btn-sm" onclick="openRouteModal()">+ Yangi Yo‘nalish Qo‘shish</button>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Raqam</th>
+                  <th>Yo‘nalish Nomi</th>
+                  <th>Avtobus</th>
+                  <th>Haydovchi</th>
+                  <th>Bekatlar Soni</th>
+                  <th>Telegram Guruh</th>
+                  <th>Holat</th>
+                  <th>Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="routesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. STOPS MANAGEMENT VIEW WITH MAP PICKER -->
+      <section id="view-stops" class="admin-view-panel">
+        <div class="glass-panel" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.75rem;">
+            <div>
+              <h3 style="font-size: 1.2rem; font-weight: 700;">Onlayn Xarita Qidiruvi & Bekat Belgilash</h3>
+              <p style="color:var(--text-muted); font-size:0.85rem;">Bekat nomini yozing — onlayn xaritadan o‘zi topadi yoki xaritadagi joyni bosing!</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openStopModal()">+ Yangi Bekat Qo‘shish</button>
+          </div>
+
+          <!-- Quick Map Place Search Box -->
+          <div style="position:relative; margin-bottom:1rem;">
+            <input type="text" id="mapSearchInput" class="form-input" 
+                   placeholder="🔍 Farg‘onadan onlayn qidirish (masalan: Qirguli, Sayilgoh, Al-Farg‘oniy, Fergana City, Texnopark, Aeroport...)" 
+                   oninput="handleMapSearch(this.value)">
+            <div id="mapSearchResults" class="glass-panel" 
+                 style="display:none; position:absolute; top:100%; left:0; right:0; z-index:2000; max-height:240px; overflow-y:auto; margin-top:4px; padding:0.5rem; background:#0f172a; border:1px solid rgba(99,102,241,0.4);"></div>
+          </div>
+
+          <div id="stopPickerMap"></div>
+        </div>
+
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700;">Mavjud Bekatlar Ro‘yxati</h3>
+            <button class="btn btn-primary btn-sm" onclick="openStopModal()">+ Yangi Bekat Qo‘shish</button>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Bekat Nomi</th>
+                  <th>Kenglik (Lat)</th>
+                  <th>Uzunlik (Lon)</th>
+                  <th>Geofence Radiusi</th>
+                  <th>Yo‘nalishlar Soni</th>
+                  <th>Holat</th>
+                  <th>Amallar</th>
+                </tr>
+              </thead>
+              <tbody id="stopsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. DRIVERS & CREDENTIALS VIEW -->
+      <section id="view-drivers" class="admin-view-panel">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <div>
+              <h3 style="font-size: 1.2rem; font-weight: 700;">Haydovchilar & Yo‘nalish Kirish Hisoblari</h3>
+              <p style="color:var(--text-muted); font-size:0.85rem;">Har bir haydovchi/yo‘nalish uchun alohida xavfsiz login va bcrypt-hash parol</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openDriverModal()">+ Yangi Haydovchi Qo‘shish</button>
+          </div>
+
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Login</th>
+                  <th>Ism Familiya</th>
+                  <th>Telefon</th>
+                  <th>Biriktirilgan Yo‘nalish</th>
+                  <th>Avtobus</th>
+                  <th>Oxirgi Kirish</th>
+                  <th>Holati</th>
+                  <th>Xavfsizlik & Parol</th>
+                </tr>
+              </thead>
+              <tbody id="driversTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. TELEGRAM SETTINGS VIEW -->
+      <section id="view-telegram" class="admin-view-panel">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          
+          <div class="glass-panel" style="padding: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">Telegram Bot Konfiguratsiyasi</h3>
+            
+            <form onsubmit="saveTelegramSettings(event)">
+              <div class="form-group">
+                <label class="form-label">Telegram Bot Token (BotFather)</label>
+                <input type="text" id="tgBotTokenInput" class="form-input" placeholder="7123456789:AAH..." required>
+                <small style="color:var(--text-muted); font-size:0.75rem;">Token faqat serverda xavfsiz saqlanadi.</small>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Asosiy Guruh / Kanal Chat ID</label>
+                <input type="text" id="tgChatIdInput" class="form-input" placeholder="-100123456789" required>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%;">
+                Sozlamalarni Saqlash
+              </button>
+            </form>
+
+            <hr style="border:0; border-top:1px solid var(--border-color); margin:1.5rem 0;">
+
+            <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;">Sinov Xabarini Yuborish</h4>
+            <div style="display:flex; gap:0.5rem;">
+              <input type="text" id="testChatIdInput" class="form-input" placeholder="Guruh Chat ID">
+              <button class="btn btn-secondary" onclick="sendTestTelegramMessage()">Sinab Ko‘rish</button>
+            </div>
+          </div>
+
+          <div class="glass-panel" style="padding: 1.5rem;">
+            <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;">Oxirgi Telegram Bildirishnomalari</h3>
+            <div class="data-table-container" style="max-height: 400px; overflow-y: auto;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Vaqt</th>
+                    <th>Yo‘nalish / Bekat</th>
+                    <th>Holat</th>
+                    <th>Urinish</th>
+                  </tr>
+                </thead>
+                <tbody id="tgLogsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 8. TRIPS HISTORY VIEW -->
+      <section id="view-trips" class="admin-view-panel">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1.25rem;">Safarlar Tarixi</h3>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Safar #</th>
+                  <th>Yo‘nalish</th>
+                  <th>Avtobus</th>
+                  <th>Haydovchi</th>
+                  <th>Boshlangan Vaqt</th>
+                  <th>Tugagan Vaqt</th>
+                  <th>Bosib O‘tilgan Bekatlar</th>
+                  <th>Holat</th>
+                </tr>
+              </thead>
+              <tbody id="tripsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. AUDIT LOGS VIEW -->
+      <section id="view-audit" class="admin-view-panel">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h3 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 1.25rem;">Tizim Audit Jurnali (Barcha amallar)</h3>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Vaqt</th>
+                  <th>Foydalanuvchi</th>
+                  <th>Amal</th>
+                  <th>Obyekt</th>
+                  <th>Tafsilot</th>
+                  <th>IP Manzil</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- 1. Bus Modal -->
+  <div class="modal-overlay" id="busModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="busModalTitle">Yangi Avtobus</h3>
+        <button class="modal-close" onclick="closeModal('busModal')">&times;</button>
+      </div>
+      <form onsubmit="handleBusSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="busFormId">
+          <div class="form-group">
+            <label class="form-label">Avtobus Nomi / Identifikatori</label>
+            <input type="text" id="busNameInput" class="form-input" placeholder="Avtobus 12" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Davlat Raqami</label>
+            <input type="text" id="busPlateInput" class="form-input" placeholder="01 | 712 SAA" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Model</label>
+            <input type="text" id="busModelInput" class="form-input" value="Isuzu SAZ NP 37">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sig‘imi (o‘rinlar)</label>
+            <input type="number" id="busCapacityInput" class="form-input" value="32" min="10" max="100">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('busModal')">Bekor Qilish</button>
+          <button type="submit" class="btn btn-primary">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Route Modal -->
+  <div class="modal-overlay" id="routeModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="routeModalTitle">Yangi Yo‘nalish</h3>
+        <button class="modal-close" onclick="closeModal('routeModal')">&times;</button>
+      </div>
+      <form onsubmit="handleRouteSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="routeFormId">
+          <div class="form-group">
+            <label class="form-label">Yo‘nalish Raqami (masalan: 12-yo‘nalish)</label>
+            <input type="text" id="routeNumberInput" class="form-input" placeholder="12-yo‘nalish" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Yo‘nalish Nomi</label>
+            <input type="text" id="routeNameInput" class="form-input" placeholder="Sergeli – Maktab" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tavsif</label>
+            <textarea id="routeDescInput" class="form-textarea" rows="2" placeholder="Marshrut ko‘chalari..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Biriktirilgan Avtobus</label>
+            <select id="routeBusSelect" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Biriktirilgan Haydovchi</label>
+            <select id="routeDriverSelect" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telegram Guruh ID (ixtiyoriy)</label>
+            <input type="text" id="routeTgChatInput" class="form-input" placeholder="-100123456789">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('routeModal')">Bekor Qilish</button>
+          <button type="submit" class="btn btn-primary">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Stop Modal -->
+  <div class="modal-overlay" id="stopModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="stopModalTitle">Yangi Bekat</h3>
+        <button class="modal-close" onclick="closeModal('stopModal')">&times;</button>
+      </div>
+      <form onsubmit="handleStopSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="stopFormId">
+          <div class="form-group" style="position:relative;">
+            <label class="form-label">🔍 Onlayn Xaritadan Qidirib Topish</label>
+            <input type="text" id="modalMapSearchInput" class="form-input" placeholder="Joy nomini yozing (masalan: Qirguli, Sayilgoh, Al-Farg‘oniy, Fergana City...)" oninput="handleModalMapSearch(this.value)">
+            <div id="modalMapSearchResults" class="glass-panel" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:2000; max-height:180px; overflow-y:auto; margin-top:2px; padding:0.5rem; background:#0f172a; border:1px solid rgba(99,102,241,0.4);"></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Bekat Nomi</label>
+            <input type="text" id="stopNameInput" class="form-input" placeholder="Masalan: Qirguli bekati" required>
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem;">
+            <div class="form-group">
+              <label class="form-label">Kenglik (Latitude)</label>
+              <input type="number" step="any" id="stopLatInput" class="form-input" placeholder="40.3864" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Uzunlik (Longitude)</label>
+              <input type="number" step="any" id="stopLonInput" class="form-input" placeholder="71.7864" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Geofence Radiusi (metr)</label>
+            <input type="number" id="stopRadiusInput" class="form-input" value="100" min="20" max="500">
+            <small style="color:var(--text-muted); font-size:0.75rem;">Avtobus shu radiusga kirganda bekatga yetib keldi deb hisoblanadi.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('stopModal')">Bekor Qilish</button>
+          <button type="submit" class="btn btn-primary">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. Driver Modal -->
+  <div class="modal-overlay" id="driverModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="driverModalTitle">Yangi Haydovchi Hisobi</h3>
+        <button class="modal-close" onclick="closeModal('driverModal')">&times;</button>
+      </div>
+      <form onsubmit="handleDriverSubmit(event)">
+        <div class="modal-body">
+          <input type="hidden" id="driverFormId">
+          <div class="form-group" id="driverUsernameGroup">
+            <label class="form-label">Login (Username)</label>
+            <input type="text" id="driverUsernameInput" class="form-input" placeholder="haydovchi12" required>
+          </div>
+          <div class="form-group" id="driverPasswordGroup">
+            <label class="form-label">Dastlabki Parol (bcrypt bilan xeshlanadi)</label>
+            <input type="password" id="driverPasswordInput" class="form-input" placeholder="Xavfsiz parol" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ism va Familiya</label>
+            <input type="text" id="driverFullNameInput" class="form-input" placeholder="Shavkat Ahmedov" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Telefon Raqami</label>
+            <input type="text" id="driverPhoneInput" class="form-input" placeholder="+998901234567">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Biriktiriladigan Yo‘nalish</label>
+            <select id="driverRouteSelect" class="form-select"></select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('driverModal')">Bekor Qilish</button>
+          <button type="submit" class="btn btn-primary">Saqlash</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. Password Reset Modal -->
+  <div class="modal-overlay" id="passwordModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Parolni Yangilash (Bcrypt)</h3>
+        <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
+      </div>
+      <form onsubmit="handlePasswordReset(event)">
+        <div class="modal-body">
+          <input type="hidden" id="resetDriverId">
+          <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:1rem;">
+            Haydovchi: <b id="resetDriverName" style="color:#fff;">—</b> uchun yangi parol o‘rnatish:
+          </p>
+          <div class="form-group">
+            <label class="form-label">Yangi Parol</label>
+            <input type="password" id="newPasswordInput" class="form-input" placeholder="Kamida 6 belgi" required minlength="6">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('passwordModal')">Bekor Qilish</button>
+          <button type="submit" class="btn btn-primary">Parolni O‘zgartirish</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Box -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/js/admin.js"></script>
+</body>
+</html>

@@ -461,6 +461,9 @@ function editRoute(r) {
 
 async function handleRouteSubmit(e) {
   e.preventDefault();
+  const submitBtn = e.target.querySelector('button[type="submit"]') || document.querySelector("#routeModal .btn-primary");
+  if (submitBtn) submitBtn.disabled = true;
+
   const id = document.getElementById("routeFormId").value;
   const route_number = document.getElementById("routeNumberInput").value.trim();
   const name = document.getElementById("routeNameInput").value.trim();
@@ -481,9 +484,19 @@ async function handleRouteSubmit(e) {
       },
       body: JSON.stringify({ route_number, name, description, bus_id, driver_id, telegram_chat_id })
     });
-    const data = await res.json();
+
+    let data = {};
+    try {
+      data = await res.json();
+    } catch (parseErr) {}
+
     if (!res.ok) {
-      showToast(data.detail || "Xatolik yuz berdi", "error");
+      if (res.status === 401) {
+        showToast("Sessiya muddati tugadi. Qaytadan kiring.", "error");
+        logoutAdmin();
+        return;
+      }
+      showToast(data.detail || ("Xatolik (" + res.status + ")"), "error");
       return;
     }
 
@@ -491,7 +504,9 @@ async function handleRouteSubmit(e) {
     closeModal("routeModal");
     loadRoutes();
   } catch (err) {
-    showToast("Server bilan aloqa uzildi", "error");
+    showToast("Server bilan aloqa uzildi: " + (err.message || ""), "error");
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 

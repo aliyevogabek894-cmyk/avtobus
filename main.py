@@ -909,6 +909,14 @@ def admin_get_routes(admin: dict = Depends(require_admin)):
 
 @app.post("/api/admin/routes")
 def admin_create_route(payload: RouteCreateRequest, admin: dict = Depends(require_admin)):
+    conn = get_db()
+    try:
+        existing = conn.execute("SELECT id FROM routes WHERE route_number = ? AND is_deleted = 0", (payload.route_number.strip(),)).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"'{payload.route_number}' raqamli yo'nalish allaqachon mavjud! Boshqa raqam tanlang.")
+    finally:
+        conn.close()
+
     with get_db_cursor() as cur:
         cur.execute("""
             INSERT INTO routes (route_number, name, description, bus_id, driver_id, telegram_chat_id, is_active)
@@ -916,11 +924,22 @@ def admin_create_route(payload: RouteCreateRequest, admin: dict = Depends(requir
         """, (payload.route_number.strip(), payload.name.strip(), payload.description, payload.bus_id, payload.driver_id, payload.telegram_chat_id))
         route_id = cur.lastrowid
 
+    public_routes_cache.invalidate()
+    public_route_detail_cache.invalidate()
     log_audit(admin["id"], admin["username"], "create_route", "route", str(route_id), f"Yangi yo'nalish: {payload.name}")
     return {"success": True, "route_id": route_id, "message": "Yo'nalish yaratildi"}
 
 @app.put("/api/admin/routes/{route_id}")
 def admin_update_route(route_id: int, payload: RouteUpdateRequest, admin: dict = Depends(require_admin)):
+    conn = get_db()
+    try:
+        if payload.route_number is not None:
+            existing = conn.execute("SELECT id FROM routes WHERE route_number = ? AND id != ? AND is_deleted = 0", (payload.route_number.strip(), route_id)).fetchone()
+            if existing:
+                raise HTTPException(status_code=400, detail=f"'{payload.route_number}' raqamli yo'nalish boshqa yo'nalishda ishlatilmoqda!")
+    finally:
+        conn.close()
+
     updates = []
     params = []
     if payload.route_number is not None:
